@@ -20,12 +20,12 @@ declaration of an array of those entries ; the implementation file contains the
 definition of that array. You may then integrate those files into your C
 project.
 
-The ability to connect to the Internet is required by the live retrieval of a
-file from GitHub:
-[Linux' `include/linux/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/linux/syscalls.h).
-Keep this in mind if you intend to run this script automatically. The
-requirement may be lifted by editing the first lines of `get_syscalls.py` to put
-the contents of that file inside the `header` variable.
+The ability to connect to the Internet is required by the live retrieval of
+three files from Linux' GitHub repository:
+* [`arch/x86/entry/syscalls/syscall_64.tbl`](https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl),
+* [`include/linux/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/linux/syscalls.h),
+* [`include/asm-generic/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/asm-generic/syscalls.h).
+The files are then cached for subsequent runs, for up to 24 hours.
 
 ## What is the issue exactly?
 
@@ -43,12 +43,13 @@ described (at the time of writing):
 * Linux'
   [`arch/x86/entry/syscalls/syscall_64.tbl`](https://github.com/torvalds/linux/blob/v6.7/arch/x86/entry/syscalls/syscall_64.tbl)
   lists all the syscalls by name and ties them to their number and entry point
-  function, but does not list parameters or return values. (406 syscalls, 373
+  function, but does not list parameters or return values. (409 syscalls, 373
   for x86\_64)
 * Linux'
   [`include/linux/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/linux/syscalls.h)
   references a lot of the entry point functions and their parameters, but not
-  return values. (448 entry point functions, with some duplicates)
+  return values. This file is complemented by
+  [`include/asm-generic/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/asm-generic/syscalls.h). (456 entry point functions, with some duplicates)
 * Linux' `/usr/include/asm/unistd_64.h` (build artefact generated from
   `syscall_64.tbl`, should also be provided with your distribution) provides
   macros for all the available syscalls on a given system, but that is only for
@@ -65,8 +66,10 @@ described (at the time of writing):
 ## Current implementation
 
 The current implementation uses the following data sources on syscalls:
+* [Linux' `arch/x86/entry/syscalls/syscall_64.tbl`](https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl),
 * [Linux' `include/linux/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/linux/syscalls.h),
-  fetched at runtime from branch `master` on GitHub.
-* `/usr/include/asm/unistd_64.h` on the executing host.
+* [Linux' `include/asm-generic/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/asm-generic/syscalls.h),
+
+all fetched at runtime from branch `master` on GitHub.
 
 The current implementation outputs C arrays and structures.
