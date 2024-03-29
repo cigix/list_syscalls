@@ -25,6 +25,8 @@ GITHUB_LINUX_PROJECT="torvalds/linux"
 # Runtime file cache
 FILE_CACHE = dict()
 
+WARM_REPOS = set()
+
 def _is_too_old(path):
     mtimestamp = os.path.getmtime(path)
     mtime = datetime.datetime.fromtimestamp(mtimestamp)
@@ -84,6 +86,58 @@ def run(cmd, cwd, *args, **kwargs):
     print(f"{cwd}$ {shlex.join(cmd)}")
     subprocess.run(cmd, cwd=cwd, check=True, *args, **kwargs)
 
+def get_from_git(url, branch, invalidate=False):
+    """get_from_git(url, branch, invalidate=False): Clone a Git repository.
+
+    Args:
+      - url: str, the URL of the repository
+      - branch: str, the branch to fetch from
+      - invalidate: bool, optional (default: False), force pull
+
+    Warning: A `git reset --hard` is done first to avoid conflicts. This may
+    lose data.
+
+    Return: str, a path to the root of the repository.
+    """
+    basename = os.path.basename(url)
+    if basename.endswith(".git"):
+        basename = basename[:-4]
+    cached_path = os.path.join(CACHE_DIR, basename)
+    if basename in WARM_REPOS:
+        return cached_path
+    reason = None
+    clone_or_pull = None
+    if not os.path.isdir(cached_path):
+        reason = "not in cache"
+        clone_or_pull = "clone"
+
+    if clone_or_pull is None and invalidate:
+        reason = "forced invalidation"
+        clone_or_pull = "pull"
+    if (clone_or_pull is None
+        and _is_too_old(os.path.join(cached_path, ".git", "FETCH_HEAD"))):
+        reason = "cache too old"
+        clone_or_pull = "pull"
+
+    if clone_or_pull == "clone":
+        print(f"{basename}.git: Cloning ({reason})")
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        run(["git", "clone",
+             "--branch", branch,
+             "--depth", "1",
+             url], CACHE_DIR)
+    elif clone_or_pull == "pull":
+        print(f"{basename}.git: Pulling ({reason})")
+        run(["git", "reset", "--hard"], cached_path)
+        run(["git", "switch", "--force", branch], cached_path)
+        run(["git", "pull", "--depth", "1"], cached_path)
+    else:
+        print(f"{basename}.git: Using cache")
+        #run(["git", "reset", "--hard"], cached_path)
+        #run(["git", "switch", "--force", branch], cached_path)
+    WARM_REPOS.add(basename)
+    return cached_path
+
 def get_from_github(project, branch, invalidate=False):
     """get_from_github(project, branch, invalidate=False): Clone a Git
       repository.
@@ -98,35 +152,5 @@ def get_from_github(project, branch, invalidate=False):
 
     Return: str, a path to the root of the repository.
     """
-    basename = os.path.basename(project)
-    cached_path = os.path.join(CACHE_DIR, basename)
-    reason = None
-    clone_or_pull = None
-    if not os.path.isdir(cached_path):
-        reason = "not in cache"
-        clone_or_pull = "clone"
-
-    if clone_or_pull is None and invalidate:
-        reason = "forced invalidation"
-        clone_or_pull = "pull"
-    if clone_or_pull is None and _is_too_old(cached_path):
-        reason = "cache too old"
-        clone_or_pull = "pull"
-
-    if clone_or_pull == "clone":
-        print(f"{basename}.git: Cloning ({reason})")
-        url = urllib.parse.urljoin(GIT_GITHUB_URL, project + ".git")
-        run(["git", "clone",
-             "--branch", branch,
-             "--depth", "1",
-             url], CACHE_DIR)
-    elif clone_or_pull == "pull":
-        print(f"{basename}.git: Pulling ({reason})")
-        run(["git", "reset", "--hard"], cached_path)
-        run(["git", "switch", "--force", branch], cached_path)
-        run(["git", "pull", "--depth", "1"], cached_path)
-    else:
-        print(f"{basename}.git: Using cache")
-        run(["git", "reset", "--hard"], cached_path)
-        run(["git", "switch", "--force", branch], cached_path)
-    return cached_path
+    url = urllib.parse.urljoin(GIT_GITHUB_URL, project + ".git")
+    return get_from_git(url, branch, invalidate)

@@ -8,7 +8,10 @@ import clex
 
 IGNORE_TOKEN = {
     "__user",
-    "asmlinkage"
+    "asmlinkage",
+    "_Nullable",
+    "[[noreturn]]",
+    "[[deprecated]]"
 }
 TYPE_SPECIFIERS_EXTRA = {
     "fd_set",
@@ -49,9 +52,12 @@ TYPE_QUALIFIERS = {
 
 # C17, section 6.7.6
 POINTER = { "*" }
+ELLIPSIS = { "..." }
 
 # C17, section 6.4.2.1, except universal-character-name
 IDENTIFIER_RE = re.compile(r"[A-Z_a-z]\w*")
+
+SYS_RE = re.compile(r"SYS_\w+")
 
 class TypePart:
     """TypePart: A part of a C declaration or type specification.
@@ -122,6 +128,30 @@ class Identifier(TypePart):
     def allowafter():
         return tuple()
 
+class CEllipsis(TypePart):
+    """CEllipsis: A C parameter-type-list terminator (C17, section 6.7.6)."""
+    @staticmethod
+    def match(tokens):
+        if tokens[0] in ELLIPSIS:
+            return 1
+        return 0
+
+    @staticmethod
+    def allowafter():
+        return tuple()
+
+class SYSConstant(TypePart):
+    """SYSConstant: A <sys/syscall.h> SYS_* constant."""
+    @staticmethod
+    def match(tokens):
+        if SYS_RE.fullmatch(tokens[0]):
+            return 1
+        return 0
+
+    @staticmethod
+    def allowafter():
+        return tuple()
+
 def parse(tokens):
     """parse(tokens): Parse tokens into TypeParts.
 
@@ -133,7 +163,7 @@ def parse(tokens):
 
     Raise ValueError if parsing fails.
     """
-    next_partcls = (TypeSpecifier, TypeQualifier)
+    next_partcls = (TypeSpecifier, TypeQualifier, CEllipsis, SYSConstant)
     parts = list()
 
     while tokens:

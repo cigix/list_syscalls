@@ -40,6 +40,9 @@ def simplify(decl):
     more specific string:
       simplify(TypeDecl("const char * const * argv")) == "ARGV"
     """
+    if (len(decl.typespec) == 1
+        and isinstance(decl.typespec[0], typedecl.CEllipsis)):
+        return "ELLIPSIS"
     # Remove qualifiers and the eventual identifier
     clean = list(filter(lambda part: isinstance(part, typedecl.TypeSpecifier)
                                      or isinstance(part, typedecl.Pointer),
@@ -67,7 +70,6 @@ def simplify(decl):
         simplified = "UNKNOWN" # Not supported
     elif spec[0].tokens[0] == "void":
         assert len(spec) == 1, "remaining specifiers after void"
-        assert pointercount > 0, "void specifier without pointer"
         simplified = "VOID"
     else:
         # integral type
@@ -134,11 +136,11 @@ def dump(syscalls):
     """dump(syscalls): Dump the syscalls' data to C files.
 
     Args:
-      - syscalls: list of tuple (SyscallTblEntry, FunDecl), the data about
-          each syscall
+      - syscalls: list of SyscallDesc, the data about each syscall
 
     Create two files, syscalls.h and syscalls.c, which contain declarations and
-    definitions describing each syscall programmatically.
+    definitions describing each syscall programmatically. If multiple
+    declarations exist for one syscall, only the last one is kept.
     """
     types = [
         "NONE",
@@ -156,25 +158,35 @@ def dump(syscalls):
         "U8", "U16", "U32", "U64",
         "SIZE_T"
     ]
-    with open("syscalls.c", "w") as f:
-        f.write(f"""#include "syscalls.h"
+
+    implementation = f"""// This file was generated automatically.
+// https://github.com/cigix/list_syscalls
+
+#include "syscalls.h"
 
 #include <stddef.h>
 
 struct syscall_entry syscalls[{len(syscalls) + 1}] =
 {{
-""")
-        for entry, decl in syscalls:
-            f.write("  // ")
-            f.write(repr(decl).replace(entry.entrypoint, entry.name))
-            f.write(";\n")
-            f.write(f"  {{{entry.number}, ")
-            f.write('"' + entry.name + '", ')
-            f.write(str(len(decl.param_list)) + ", ")
+"""
+
+    for syscall in syscalls:
+        if syscall.decls:
+            decl = syscall.decls[-1].decl
+            implementation += f"  // {syscall.decls[-1].origin}: {decl}\n"
+        else:
+            decl = None
+            implementation += "  // no declaration found\n"
+
+        implementation += f"  {{{syscall.entry.number}, "
+        implementation += '"' + syscall.entry.name + '", '
+
+        if decl:
+            implementation += str(len(decl.param_list)) + ", "
             t = simplify(decl.return_type)
             if t not in types:
                 types.append(t)
-            f.write(t + ", ")
+            implementation += t + ", "
             ps = list()
             for param in decl.param_list:
                 t = simplify(param)
@@ -182,13 +194,24 @@ struct syscall_entry syscalls[{len(syscalls) + 1}] =
                     types.append(t)
                 ps.append(t)
             ps += ["NONE"] * (6 - len(decl.param_list))
-            f.write("{" + ", ".join(ps) + "}},\n")
-        f.write("""  {-1, NULL, 6, UNKNOWN, {UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN}}
+            implementation += "{" + ", ".join(ps) + "}},\n"
+        else:
+            implementation += ("6, UNKNOWN, {UNKNOWN, UNKNOWN, UNKNOWN, "
+                                            "UNKNOWN, UNKNOWN, UNKNOWN}},\n")
+
+    implementation += """  {-1, NULL, 6, UNKNOWN, {UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN}}
 };
-""")
+"""
+
+
+    with open("syscalls.c", "w") as f:
+        f.write(implementation)
 
     with open("syscalls.h", "w") as f:
-        f.write(f"""#pragma once
+        f.write(f"""// This file was generated automatically.
+// https://github.com/cigix/list_syscalls
+
+#pragma once
 
 enum TYPE
 {{
@@ -212,7 +235,7 @@ def _main():
     for syscall in syscall_tbl.get_x86_64_list():
         if syscall.entrypoint:
             for decl in syscalls_h.find_decls(syscall.entrypoint):
-                f = fundecl.FunDecl(decl)
+                f = fundecl.parse(decl)
                 print(simplify(f.return_type), end='')
                 print(" ", end='')
                 print(syscall.name, end='')

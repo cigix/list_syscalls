@@ -14,18 +14,16 @@ Run (Internet connection required):
 ```bash
 $ ./list_syscalls.py
 ```
+
 This creates two files, `syscalls.h` and `syscalls.c`. The header file contains
-meta-type descriptions, a definition for `struct syscall_entry`, and the
-declaration of an array of those entries ; the implementation file contains the
+meta-type descriptions, a definition for `struct syscall_entry`, and the extern
+declaration of an array of those entries; the implementation file contains the
 definition of that array. You may then integrate those files into your C
 project.
 
 The ability to connect to the Internet is required by the live retrieval of
-three files from Linux' GitHub repository:
-* [`arch/x86/entry/syscalls/syscall_64.tbl`](https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl),
-* [`include/linux/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/linux/syscalls.h),
-* [`include/asm-generic/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/asm-generic/syscalls.h).
-The files are then cached for subsequent runs, for up to 24 hours.
+files from Linux' GitHub repository, as well as a clone of the man-pages
+project. The files are then cached for subsequent runs, for up to 24 hours.
 
 ## What is the issue exactly?
 
@@ -69,7 +67,8 @@ The current implementation uses the following data sources on syscalls:
 * [Linux' `arch/x86/entry/syscalls/syscall_64.tbl`](https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl),
 * [Linux' `include/linux/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/linux/syscalls.h),
 * [Linux' `include/asm-generic/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/asm-generic/syscalls.h),
+* [man-pages' `man2/`](https://git.kernel.org/pub/scm/docs/man-pages/man-pages.git/tree/man2),
 
-all fetched at runtime from branch `master` on GitHub.
+all fetched at runtime from branch `master` on their respective repository.
 
 The current implementation outputs C arrays and structures.
