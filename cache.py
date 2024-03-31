@@ -7,12 +7,15 @@ import hashlib
 import os
 import os.path
 import shlex
+import shutil
 import subprocess
 import urllib.parse
 import urllib.request
 
 CACHE_DIR="./.cache"
 CACHE_TIMEOUT=datetime.timedelta(days=1)
+CACHE_BUILD="_build"
+CACHE_INSTALL="_install"
 
 RAW_GITHUB_HOST="raw.githubusercontent.com"
 RAW_GITHUB_URL="https://"+RAW_GITHUB_HOST
@@ -155,3 +158,76 @@ def get_from_github(project, branch, invalidate=False):
     """
     url = urllib.parse.urljoin(GIT_GITHUB_URL, project + ".git")
     return get_from_git(url, branch, invalidate)
+
+def configure(root, invalidate=False, configure_args=None):
+    """configure(root, invalidate, configure_args): Configure a build.
+
+    Args:
+      - root: str, the root of the project to configure
+      - invalidate: bool, optional (default: False), force reconfigure
+      - configure_args: list of str, optional (default: []), additional
+          arguments to the "configure" script
+    """
+    project = os.path.basename(root)
+    build_dir = os.path.join(root, CACHE_BUILD)
+    install_dir = os.path.join(root, CACHE_INSTALL)
+
+    reason = None
+    if not os.path.isdir(build_dir):
+        reason = "not in cache"
+    if reason is None and invalidate:
+        reason = "forced invalidation"
+    if reason is None and _is_too_old(build_dir):
+        reason = "cache too old"
+    if reason is None:
+        return
+    print(f"{project}: Configuring ({reason})")
+
+    if os.path.isdir(build_dir):
+        shutil.rmtree(build_dir)
+    if os.path.isdir(install_dir):
+        shutil.rmtree(install_dir)
+    os.mkdir(build_dir)
+    configure_cmd = ["../configure", "--prefix", os.path.abspath(install_dir)]
+    if configure_args:
+        configure_cmd.extend(configure_args)
+    run(configure_cmd, build_dir)
+
+def make(root, target=None, invalidate=False, make_args=None):
+    """make(root, target, invalidate, make_args): Do a build.
+
+    Args:
+      - root: str, the root of the project to configure
+      - target: str, optional, the target to make
+      - invalidate: bool, optional (default: False), force rebuild
+      - make_args: list of str, optional (default: []), additional arguments to
+          "make"
+
+    The target should be one that installs files.
+
+    Return: str, the path to the install directory.
+    """
+    project = os.path.basename(root)
+    build_dir = os.path.join(root, CACHE_BUILD)
+    install_dir = os.path.join(root, CACHE_INSTALL)
+
+    reason = None
+    if not os.path.isdir(install_dir):
+        reason = "not in cache"
+    if reason is None and invalidate:
+        reason = "forced invalidation"
+    if reason is None and _is_too_old(install_dir):
+        reason = "cache too old"
+    if reason is None:
+        return install_dir
+    print(f"{project}: Making ({reason})")
+
+    if os.path.isdir(install_dir):
+        shutil.rmtree(install_dir)
+    make_cmd = ["make"]
+    if target:
+        make_cmd.append(target)
+    if make_args:
+        make_cmd.extend(make_args)
+    run(make_cmd, build_dir)
+    return install_dir

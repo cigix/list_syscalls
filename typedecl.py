@@ -10,8 +10,10 @@ IGNORE_TOKEN = {
     "__user",
     "asmlinkage",
     "_Nullable",
+    "_Noreturn",
     "[[noreturn]]",
-    "[[deprecated]]"
+    "[[deprecated]]",
+    "extern"
 }
 TYPE_SPECIFIERS_EXTRA = {
     "fd_set",

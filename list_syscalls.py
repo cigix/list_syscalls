@@ -5,8 +5,10 @@ import sys
 
 import c_output
 import fundecl
+import glibc
 import html_output
 import manpages
+import musl
 import syscall_tbl
 import syscalls_h
 
@@ -24,12 +26,14 @@ class SyscallDesc:
         self.entry = entry
         self.decls = decls
 
-ALL_SOURCES=("linux", "man")
+ALL_SOURCES=("linux", "man", "musl", "glibc")
 ALL_FORMATS=("c", "html")
 
 SOURCE_NAME={
         "linux": "Linux' syscalls.h",
-        "man": "man pages"
+        "man": "man pages",
+        "musl": "musl libc",
+        "glibc": "GNU libc"
     }
 FORMAT_FILES={
         "c": ("syscalls.h", "syscalls.c"),
@@ -47,6 +51,34 @@ Options:
     -f FORMATS  Specify the formats to output as, comma separated.
                 Valid formats: {", ".join(ALL_FORMATS)}
                 Default: all
+
+About sources:
+  linux: Linux' `syscalls.h` headers. Provides declarations for the kernel-side
+         entrypoints.
+         Good quality: exhaustive, lacks return values.
+  man:   Linux `man-pages` project. Provides high-level descriptions on how a
+         syscall should be called assuming the presence of a libc.
+         High quality: exhaustive, sometimes too detailed for our simple parser.
+  musl:  musl libc. Provides simple declarations for the libc wrappers.
+         Low quality: minimal, lacks parameter names.
+  glibc: GNU libc. Provides declarations for the libc wrappers.
+         Low quality: bad coverage, often declarations are too complex for our
+         simple parser.
+
+  Not all sources are guaranteed to provide the same, or even compatible,
+  declarations, or even a declaration at all for each syscall.
+
+  If multiple declarations appear for one syscall (either because multiple
+  sources were used, and/or one source produced multiple declarations), they are
+  fed in command line order to the formatters.
+
+About formats:
+  c:     Describe the syscalls with a C array of structures, one declaration per
+         syscall (the last one provided by the sources).
+  html:  Describe the syscalls with an HTML table. All declarations are used.
+
+  When using an output format that can only describe one declaration, we
+  recommend sticking to high quality sources.
 """)
         return 0
 
@@ -88,6 +120,17 @@ Options:
                   file=sys.stderr)
             return 1
 
+    syscall_tbl.warm()
+    if "linux" in sources:
+        syscalls_h.warm()
+    if "man" in sources:
+        manpages.warm()
+    if "musl" in sources:
+        musl.warm()
+    if "glibc" in sources:
+        glibc.warm()
+    print()
+
     entries = syscall_tbl.get_x86_64_list()
     descs = list()
     for entry in entries:
@@ -102,6 +145,15 @@ Options:
                 case "man":
                     if decl := manpages.get_decl(entry.name):
                         decls.append(SyscallDecl(decl, SOURCE_NAME["man"]))
+                case "musl":
+                    for header in manpages.get_headers(entry.name):
+                        for decl in musl.find_decls(entry.name, header):
+                            decls.append(SyscallDecl(decl, SOURCE_NAME["musl"]))
+                case "glibc":
+                    for header in manpages.get_headers(entry.name):
+                        for decl in glibc.find_decls(entry.name, header):
+                            decls.append(
+                                    SyscallDecl(decl, SOURCE_NAME["glibc"]))
         descs.append(SyscallDesc(entry, decls))
 
     if "c" in formats:
@@ -110,22 +162,26 @@ Options:
         html_output.dump(descs)
 
     origins = dict()
+    lastorigins = dict()
     not_found = 0
     for desc in descs:
         if not desc.decls:
             not_found += 1
         else:
             for origin in {decl.origin for decl in desc.decls}:
-                if origin in origins:
-                    origins[origin] += 1
-                else:
-                    origins[origin] = 1
+                origins.setdefault(origin, 0)
+                origins[origin] += 1
+            lastorigin = desc.decls[-1].origin
+            lastorigins.setdefault(lastorigin, 0)
+            lastorigins[lastorigin] += 1
 
     print()
     print(f"{len(entries)} x86_64 syscalls listed in syscall_tbl:")
     for source in reversed(sources):
         name = SOURCE_NAME[source]
-        print(f"  - {origins[name]} declarations found in {name},")
+        if name in origins:
+            print(f"  - {origins[name]}({lastorigins.get(name, 0)}) "
+                  f"declarations found in {name},")
     print(f"  - {not_found} not found anywhere.")
     print(f"{len(entries) - not_found} declarations dumped in:")
     for f in formats:
