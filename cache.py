@@ -1,3 +1,7 @@
+"""
+cache.py: Caching utilities.
+"""
+
 import datetime
 import hashlib
 import os
@@ -6,10 +10,6 @@ import shlex
 import subprocess
 import urllib.parse
 import urllib.request
-
-"""
-cache.py: Caching utilities.
-"""
 
 CACHE_DIR="./.cache"
 CACHE_TIMEOUT=datetime.timedelta(days=1)
@@ -52,21 +52,21 @@ def get_file_from_github(project, branch, path, invalidate=False, binary=False):
         return FILE_CACHE[h][binary]
     cached_path = os.path.join(CACHE_DIR, h)
 
-    invalidate = None
+    reason = None
     if not os.path.isfile(cached_path):
-        invalidate = "not in cache"
-    if invalidate is None and invalidate:
-        invalidate = "forced invalidation"
-    if invalidate is None and _is_too_old(cached_path):
-        invalidate = "cache too old"
+        reason = "not in cache"
+    if reason is None and invalidate:
+        reason = "forced invalidation"
+    if reason is None and _is_too_old(cached_path):
+        reason = "cache too old"
 
-    if invalidate is None:
+    if reason is None:
         print(f"{path}: Using cache")
         mode = "rb" if binary else "rt"
         with open(cached_path, mode) as f:
             data = f.read()
     else:
-        print(f"{path}: Downloading ({invalidate})")
+        print(f"{path}: Downloading ({reason})")
         url = urllib.parse.urljoin(RAW_GITHUB_URL,
                                    project + '/' + branch + '/' + path)
         with urllib.request.urlopen(url) as response:
@@ -126,6 +126,7 @@ def get_from_git(url, branch, invalidate=False):
              "--branch", branch,
              "--depth", "1",
              url], CACHE_DIR)
+        run(["git", "pull", "--depth", "1"], cached_path) # create FETCH_HEAD
     elif clone_or_pull == "pull":
         print(f"{basename}.git: Pulling ({reason})")
         run(["git", "reset", "--hard"], cached_path)
