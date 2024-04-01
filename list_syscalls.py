@@ -5,6 +5,7 @@ import sys
 
 import c_output
 import fundecl
+import html_output
 import manpages
 import syscall_tbl
 import syscalls_h
@@ -24,14 +25,15 @@ class SyscallDesc:
         self.decls = decls
 
 ALL_SOURCES=("linux", "man")
-ALL_FORMATS=("c")
+ALL_FORMATS=("c", "html")
 
 SOURCE_NAME={
         "linux": "Linux' syscalls.h",
         "man": "man pages"
     }
 FORMAT_FILES={
-        "c": ("syscalls.h", "syscalls.c")
+        "c": ("syscalls.h", "syscalls.c"),
+        "html": ("syscalls.html",)
     }
 
 def main(argv):
@@ -104,6 +106,8 @@ Options:
 
     if "c" in formats:
         c_output.dump(descs)
+    if "html" in formats:
+        html_output.dump(descs)
 
     origins = dict()
     not_found = 0
