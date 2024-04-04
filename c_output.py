@@ -154,8 +154,8 @@ def dump(syscalls):
         "UINT",
         "LONG",
         "ULONG",
-        "I8", "I16", "I32", "I64",
-        "U8", "U16", "U32", "U64",
+        "INT8", "INT16", "INT32", "INT64",
+        "UINT8", "UINT16", "UINT32", "UINT64",
         "SIZE_T"
     ]
 

@@ -1,8 +1,8 @@
 # `list_syscalls`: Get a programmatic description of Linux x86\_64 syscalls
 
 This project aims at automating the description of Linux x86\_64 syscalls for
-use in other programs. Currently, the programs builds a C array, but other
-languages could be adapted.
+use in other programs. Currently, the program builds a C array and a HTML table,
+but other languages could be adapted.
 
 This project is meant as an extension to, and was heavily inspired by, Filippo
 Valsorda's
@@ -12,18 +12,15 @@ Valsorda's
 
 Run (Internet connection required):
 ```bash
-$ ./list_syscalls.py
+$ ./list_syscalls.py [-s <SOURCES>] [-f <FORMATS>]
 ```
 
-This creates two files, `syscalls.h` and `syscalls.c`. The header file contains
-meta-type descriptions, a definition for `struct syscall_entry`, and the extern
-declaration of an array of those entries; the implementation file contains the
-definition of that array. You may then integrate those files into your C
-project.
+This will fetch resources based on the SOURCES parameter, and create files based
+on the FORMATS parameter. See `./list_syscalls.py --help` for more info.
 
-The ability to connect to the Internet is required by the live retrieval of
-files from Linux' GitHub repository, as well as a clone of the man-pages
-project. The files are then cached for subsequent runs, for up to 24 hours.
+The ability to connect to the Internet is required by the live retrieval and
+building of files from the sources, including a mandatory one. The files are
+then cached for subsequent runs, for up to 24 hours.
 
 ## What is the issue exactly?
 
@@ -55,8 +52,8 @@ described (at the time of writing):
 * The [GNU C Library](https://www.gnu.org/software/libc/) has `syscalls.list`s,
   from which the wrappers are generated, but they are very terse regarding
   parameters and return values. (188 syscalls)
-* The GNU C Library also has headers that describe the wrappers, but they are
-  neither centralised nor described in a central place.
+* libcs also have headers that describe the wrappers, but they are neither
+  centralised nor described in a central place.
 * The [Linux man-pages](https://www.kernel.org/doc/man-pages/index.html) provide
   documentation for syscalls wrappers in section 2, but they are loosely
   formatted. (502 entries, not all for x86\_64)
@@ -64,11 +61,13 @@ described (at the time of writing):
 ## Current implementation
 
 The current implementation uses the following data sources on syscalls:
-* [Linux' `arch/x86/entry/syscalls/syscall_64.tbl`](https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl),
-* [Linux' `include/linux/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/linux/syscalls.h),
-* [Linux' `include/asm-generic/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/asm-generic/syscalls.h),
-* [man-pages' `man2/`](https://git.kernel.org/pub/scm/docs/man-pages/man-pages.git/tree/man2),
+* [Linux' `arch/x86/entry/syscalls/syscall_64.tbl`](https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl) (mandatory),
+* [Linux' `include/linux/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/linux/syscalls.h) (optional),
+* [Linux' `include/asm-generic/syscalls.h`](https://github.com/torvalds/linux/blob/master/include/asm-generic/syscalls.h) (optional),
+* [man-pages' `man2/`](https://git.kernel.org/pub/scm/docs/man-pages/man-pages.git/tree/man2) (optional),
+* [musl](https://musl.libc.org/) (optional),
+* [glibc](https://sourceware.org/glibc/) (optional, requires a build),
 
 all fetched at runtime from branch `master` on their respective repository.
 
-The current implementation outputs C arrays and structures.
+The current implementation can output C arrays and structures, and a HTML table.
