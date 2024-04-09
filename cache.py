@@ -30,6 +30,12 @@ FILE_CACHE = dict()
 
 WARM_REPOS = set()
 
+def _mkdir():
+    if not os.path.isdir(CACHE_DIR):
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(os.path.join(CACHE_DIR, "CACHEDIR.TAG"), "w") as f:
+            f.write("Signature: 8a477f597d28d172789f06886806bc55")
+
 def _is_too_old(path):
     mtimestamp = os.path.getmtime(path)
     mtime = datetime.datetime.fromtimestamp(mtimestamp)
@@ -74,7 +80,7 @@ def get_file_from_github(project, branch, path, invalidate=False, binary=False):
                                    project + '/' + branch + '/' + path)
         with urllib.request.urlopen(url) as response:
             data = response.read()
-        os.makedirs(CACHE_DIR, exist_ok=True)
+        _mkdir()
         with open(cached_path, "wb") as f:
             f.write(data)
         if not binary:
@@ -124,7 +130,7 @@ def get_from_git(url, branch, invalidate=False):
 
     if clone_or_pull == "clone":
         print(f"{basename}.git: Cloning ({reason})")
-        os.makedirs(CACHE_DIR, exist_ok=True)
+        _mkdir()
         run(["git", "clone",
              "--branch", branch,
              "--depth", "1",
